@@ -171,7 +171,7 @@
     <div class="view" id="view-narrator">
       <div class="tabs" data-tabs="nr">
         <button class="tab active" data-tab="nr-live">Live narrator</button>
-        <button class="tab" data-tab="nr-sample">Example Claude output</button>
+        <button class="tab" data-tab="nr-sample">Example Claude output (run-001)</button>
         <button class="tab" data-tab="nr-prompt">The prompt</button>
       </div>
       <div class="tabpanel active" id="nr-live">
@@ -186,8 +186,8 @@
       </div>
       <div class="tabpanel" id="nr-sample">
         <div class="card">
-          <p class="card-sub">Pre-generated with Claude using this exact prompt on the default run —
-          the LLM experience with zero setup.</p>
+          <p class="card-sub" id="sample-caption"></p>
+          <div class="callout callout-warn" id="sample-mismatch" style="display:none"></div>
           <div class="brief" id="sample-brief"></div>
         </div>
       </div>
@@ -238,12 +238,43 @@
         </div>
       </div>
       <div class="card">
-        <h3>Stack</h3>
+        <h3>Model selection: why CV picks the winner, and the holdout only reports</h3>
+        <p class="card-sub">
+          The winner is the model with the highest <strong>mean 5-fold cross-validation AUC</strong>,
+          computed on training data only. The holdout is never consulted during selection — it produces
+          one final, <strong>unbiased</strong> estimate of the chosen model. If we instead picked the
+          winner by holdout AUC, the holdout would silently become part of the selection procedure and
+          its estimate would be optimistically biased ("test-set peeking"). This is the standard
+          practice recommended in
+          <a href="https://arxiv.org/abs/1811.12808" target="_blank" rel="noopener">Raschka (2018),
+          <em>Model Evaluation, Model Selection, and Algorithm Selection in ML</em></a>.
+          <br><br>
+          <strong>Trade-offs:</strong> CV estimates average five fold-models rather than the final
+          refit model, and each CV mean carries its own variance — with close scores (&lt;0.01 AUC)
+          prefer the simpler model. The gold standard when hyperparameter tuning enters the picture is
+          <em>nested</em> cross-validation (an inner loop selects, an outer loop estimates), at ~K×
+          the compute — the natural next step here once a hyperparameter search is added.
+        </p>
+      </div>
+      <div class="card">
+        <h3>Stack &amp; sources</h3>
         <p class="card-sub">Python · pandas · scikit-learn (LogReg / Random Forest / HistGradientBoosting,
         5-fold stratified CV, permutation importance) · FastAPI backend with an in-memory run registry ·
         dependency-free HTML/CSS/JS frontend · Claude (Opus 4.8) for narration with a deterministic
-        fallback · fully reproducible from a seed. Sources for every pain point are in
-        <a href="https://github.com/" onclick="return false" title="RESEARCH.md in the repo">RESEARCH.md</a>.</p>
+        fallback · fully reproducible from a seed.</p>
+        <p class="card-sub">
+          <a href="https://github.com/FairosMirza/churn-lab" target="_blank" rel="noopener">GitHub repo</a> ·
+          <a href="https://github.com/FairosMirza/churn-lab/blob/main/RESEARCH.md" target="_blank" rel="noopener">RESEARCH.md (all sources)</a> ·
+          <a href="https://github.com/FairosMirza/churn-lab/blob/main/README.md" target="_blank" rel="noopener">README</a> ·
+          <a href="https://github.com/FairosMirza/churn-lab/blob/main/generate_data.py" target="_blank" rel="noopener">data generator</a>.
+          Primary pain-point sources:
+          <a href="https://www.trustpilot.com/review/careem.com" target="_blank" rel="noopener">Trustpilot</a>,
+          <a href="https://careem.pissedconsumer.com/review.html" target="_blank" rel="noopener">PissedConsumer</a>,
+          <a href="https://www.menabytes.com/careem-peak-pricing-saudi-customers-not-happy/" target="_blank" rel="noopener">MENAbytes</a>,
+          <a href="https://lovin.co/dubai/en/news/careem-uber-taxis-rain" target="_blank" rel="noopener">Lovin Dubai</a>,
+          <a href="https://why.careem.com/en/building-the-everything-app/" target="_blank" rel="noopener">Careem — Everything App</a>,
+          <a href="https://www.mckinsey.com/capabilities/quantumblack/our-insights/ai-and-the-super-app-an-interview-with-careems-selim-turki" target="_blank" rel="noopener">McKinsey × Careem Data/AI</a>.
+        </p>
       </div>
     </div>
 

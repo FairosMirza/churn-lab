@@ -172,7 +172,7 @@ function render(data) {
     `<label><input type="checkbox" value="${m}" ${D.run.params.models.includes(m) ? "checked" : ""}> ${m}</label>`).join("");
   $("#exp-kpis").innerHTML =
     statTile("Churn rate", fmtPct(D.meta.churn_rate), `${fmtNum(D.meta.n_users)} users`) +
-    statTile("Best model", D.best_model, `holdout AUC ${best.test_auc.toFixed(3)}`) +
+    statTile("Best model", D.best_model, `CV AUC ${best.cv_auc_mean.toFixed(3)} · holdout ${best.test_auc.toFixed(3)}`) +
     statTile("Recall @ top 10%", fmtPct(best.recall_at_top10pct, 0), "churners caught in riskiest decile") +
     statTile("Revenue at risk", fmtAED(D.leadership.annual_revenue_at_risk_aed), `${fmtNum(D.meta.n_holdout)}-user holdout / yr`);
   $("#lb-run-tag").textContent = D.run.id;
@@ -184,8 +184,10 @@ function render(data) {
       r.train_seconds.toFixed(1) + "s"]),
     { winnerIdx: 0 });
   $("#winner-callout").innerHTML =
-    `<strong>Winner: ${D.best_model}</strong> — catches ${fmtPct(best.recall_at_top10pct, 0)} of churners
-     in the riskiest 10% of users, at a ${fmtPct(D.meta.churn_rate)} base churn rate.`;
+    `<strong>Winner: ${D.best_model}</strong> — selected by mean CV AUC (${best.cv_auc_mean.toFixed(3)});
+     the untouched holdout gives an unbiased AUC of ${best.test_auc.toFixed(3)} and shows it catching
+     ${fmtPct(best.recall_at_top10pct, 0)} of churners in the riskiest 10% of users
+     (base churn ${fmtPct(D.meta.churn_rate)}). Why CV selects and the holdout only reports → Methodology.`;
   $("#verticals-chart").innerHTML = hBars(
     Object.entries(D.churn_by_verticals).map(([k, v]) => ({ label: `${k} vertical${k === "1" ? "" : "s"}`, value: v })),
     { fmt: (v) => fmtPct(v, 1) });
@@ -214,12 +216,16 @@ function render(data) {
   $("#user-picker").innerHTML = chips;
   const showUser = (i) => {
     const e = D.explanations[i];
+    const topFactor = e.contributions[0];
     const top = e.contributions.slice(0, 3).map((c) =>
       `<li><strong>${c.feature}</strong> = ${c.user_value} (typical ${c.typical_value}) adds
        <strong>${(c.risk_contribution >= 0 ? "+" : "") + fmtPct(c.risk_contribution, 0)}</strong></li>`).join("");
     $("#user-summary").innerHTML =
-      `<div class="risk-hero">${fmtPct(e.risk, 0)}<small>predicted churn risk · dominant driver: ${e.driver}</small></div>
-       <p class="card-sub" style="margin-top:10px">Main reasons vs a typical user:</p><ul>${top}</ul>`;
+      `<div class="risk-hero">${fmtPct(e.risk, 0)}<small>predicted churn risk ·
+       top risk factor: <strong>${topFactor.feature}</strong> (${(topFactor.risk_contribution >= 0 ? "+" : "") + fmtPct(topFactor.risk_contribution, 0)})</small></div>
+       <p class="card-sub" style="margin-top:8px">Assigned retention segment: <strong>${e.driver}</strong>
+       — a rule-based mapping to a playbook action; it can differ from the model's top risk factor.</p>
+       <p class="card-sub">Main reasons vs a typical user:</p><ul>${top}</ul>`;
     $("#contrib-chart").innerHTML = divergingBars(
       e.contributions.map((c) => ({ label: c.feature, value: c.risk_contribution })),
       (v) => (v >= 0 ? "+" : "") + fmtPct(v, 0));
@@ -234,7 +240,7 @@ function render(data) {
 
   /* playbook */
   $("#segments-table").innerHTML = table(
-    [{ label: "Dominant driver" }, { label: "Users", num: 1 }, { label: "Avg risk", num: 1 },
+    [{ label: "Retention segment" }, { label: "Users", num: 1 }, { label: "Avg risk", num: 1 },
      { label: "Recommended action" }, { label: "Assumed save", num: 1 }, { label: "Revenue protected / yr", num: 1 }],
     D.segments.map((s) => [s.driver, s.users, fmtPct(s.avg_risk, 0), s.recommended_action,
       fmtPct(s.assumed_save_rate, 0), fmtAED(s.annual_revenue_protected_aed)]));
@@ -242,15 +248,21 @@ function render(data) {
   /* what-if */
   $("#whatif-pills").innerHTML = D.what_ifs.map((w, i) =>
     `<button class="pill ${i === 0 ? "active" : ""}" data-i="${i}">${w.intervention}</button>`).join("");
+  const fmtROI = (r) => (r === null || r === undefined) ? "—" : r.toFixed(1) + "×";
   const showWhatIf = (i) => {
     const w = D.what_ifs[i];
     const delta = w.new_churn_rate - w.baseline_churn_rate;
+    const roiNote = w.roi !== null && w.roi < 0
+      ? `<span style="color:#b23230;font-weight:600">negative — avoid at these costs</span>`
+      : `on AED ${fmtNum(w.est_annual_cost_aed)} assumed cost`;
     $("#whatif-stats").innerHTML =
       statTile("Users affected", fmtNum(w.users_affected)) +
       statTile("Predicted churn rate", fmtPct(w.new_churn_rate),
         `<span class="up">${(delta * 100).toFixed(2)} pts vs ${fmtPct(w.baseline_churn_rate)}</span>`) +
       statTile("Churners prevented", fmtNum(w.churners_prevented)) +
-      statTile("Revenue protected / yr", fmtAED(w.annual_revenue_protected_aed));
+      statTile("Revenue protected / yr", fmtAED(w.annual_revenue_protected_aed)) +
+      statTile("Est. intervention cost / yr", fmtAED(w.est_annual_cost_aed), "planning assumption") +
+      statTile("Estimated ROI", fmtROI(w.roi), roiNote);
     $("#whatif-design").innerHTML = w.design ?
       `<h3>How we'd test it</h3>
        <p><strong>Hypothesis:</strong> ${w.design.hypothesis}.</p>
@@ -271,13 +283,17 @@ function render(data) {
     statTile("Customers at risk (top decile)", fmtNum(D.leadership.customers_at_risk)) +
     statTile("Annual revenue at risk", fmtAED(D.leadership.annual_revenue_at_risk_aed), "holdout only") +
     statTile("#1 churn driver", D.leadership.top_driver) +
-    statTile("Best intervention ROI", fmtAED(D.leadership.best_play_revenue) + "/yr");
+    statTile("Highest estimated annual upside", fmtAED(D.leadership.best_play_revenue) + "/yr",
+      `${fmtROI(D.what_ifs[0].roi)} ROI on assumed costs`);
   $("#whatif-table").innerHTML = table(
     [{ label: "Intervention" }, { label: "Users affected", num: 1 }, { label: "Churn: before → after", num: 1 },
-     { label: "Churners prevented", num: 1 }, { label: "Revenue protected / yr", num: 1 }],
+     { label: "Churners prevented", num: 1 }, { label: "Revenue protected / yr", num: 1 },
+     { label: "Est. cost / yr", num: 1 }, { label: "ROI", num: 1 }],
     D.what_ifs.map((w) => [w.intervention, fmtNum(w.users_affected),
       `${fmtPct(w.baseline_churn_rate)} → ${fmtPct(w.new_churn_rate)}`,
-      fmtNum(w.churners_prevented), fmtAED(w.annual_revenue_protected_aed)]),
+      fmtNum(w.churners_prevented), fmtAED(w.annual_revenue_protected_aed),
+      fmtAED(w.est_annual_cost_aed),
+      w.roi !== null && w.roi < 0 ? `<span style="color:#f0938f;font-weight:600">${fmtROI(w.roi)}</span>` : fmtROI(w.roi)]),
     { winnerIdx: 0 });
   const [p1, p2] = D.what_ifs;
   $("#the-ask").innerHTML =
@@ -291,6 +307,15 @@ function render(data) {
      </ul></details>`;
 
   /* narrator */
+  $("#sample-caption").textContent =
+    "Example — run-001 (default configuration: 8,000 users · seed 42 · 3 models). " +
+    "Pre-generated with Claude using this exact prompt, so you can see the LLM experience without an API key.";
+  const isDefaultRun = D.meta.n_users === 8000 && D.meta.seed === 42 && D.leaderboard.length === 3;
+  $("#sample-mismatch").style.display = isDefaultRun ? "none" : "block";
+  $("#sample-mismatch").innerHTML =
+    `<strong>Note:</strong> the workspace is currently on <strong>${D.run.id}</strong>
+     (${fmtNum(D.meta.n_users)} users · seed ${D.meta.seed}); the example below refers to the
+     default run-001 configuration. Use the <em>Live narrator</em> tab for this run's numbers.`;
   $("#sample-brief").innerHTML = mdToHtml(D.narrative.sample_llm_brief);
   $("#prompt-text").textContent = D.narrative.prompt;
   $("#narrate-source").textContent = "";
@@ -302,8 +327,8 @@ function renderMethodology() {
   const steps = [
     ["Simulate", "generate_users(n, seed): 16-feature behavioural dataset; churn drawn from a latent logit encoding publicly-documented pain points."],
     ["Split", "Stratified train/holdout split (configurable %) so every metric below is out-of-sample."],
-    ["Cross-validate", "5-fold stratified CV per selected model (LogReg pipeline w/ scaling, Random Forest, HistGradientBoosting)."],
-    ["Evaluate", "Holdout AUC, PR-AUC, Brier, recall@top-10% — winner = highest holdout AUC."],
+    ["Select", "5-fold stratified CV per model (LogReg pipeline w/ scaling, Random Forest, HistGradientBoosting) — winner = highest mean CV AUC, training data only."],
+    ["Report", "The untouched holdout gives the unbiased final estimate: AUC, PR-AUC, Brier, recall@top-10%. It never influences selection."],
     ["Explain", "Permutation importance (global) + median-counterfactual attribution (per user) + exposure lift table (evidence)."],
     ["Segment", "Top-decile risk users get a dominant driver via ordered business rules → action + revenue math."],
     ["Simulate interventions", "Mutate the feature matrix per preset, re-score all holdout users with the winning model, sum the risk deltas."],
@@ -313,6 +338,8 @@ function renderMethodology() {
     `<div class="pipe-step"><div class="pipe-n">STEP ${i + 1}</div><h4>${t}</h4><p>${d}</p></div>`).join("");
 
   const gloss = [
+    ["Model selection", "winner = highest mean 5-fold CV AUC on training data; the holdout is reserved for the final unbiased estimate (Raschka 2018).", "argmax(cv_auc_mean)"],
+    ["Estimated ROI (what-if)", "revenue protected net of the assumed annual intervention cost, relative to that cost. Costs are planning assumptions per affected user.", "(protected − cost) / cost"],
     ["Churn rate", "share of users with no activity in the following 60 days (simulated label)."],
     ["Recall @ top 10%", "churners inside the riskiest decile ÷ all churners — what a retention team can actually action.", "recall = y[p ≥ q90].sum() / y.sum()"],
     ["Revenue at risk / yr", "each holdout user's churn probability × monthly spend × 12, summed.", "Σ pᵢ · spendᵢ · 12"],

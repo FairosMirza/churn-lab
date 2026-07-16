@@ -107,6 +107,19 @@ EXPERIMENT_DESIGNS = {
     },
 }
 
+# Estimated annual intervention cost per affected user (AED) - planning
+# assumptions, clearly labelled as such, so upside can be stated as true ROI:
+# ROI = (revenue protected - intervention cost) / intervention cost.
+INTERVENTION_COSTS = {
+    "Halve Captain cancellations": 15,                # cancellation compensation credits
+    "Cut pickup wait times by 25%": 10,               # dispatch investment, amortised
+    "Instant wallet refunds (no refund delays)": 12,  # wallet float + ops
+    "Eliminate failed payments": 8,                   # payments eng fix, amortised
+    "Cross-vertical push: single-vertical users adopt a 2nd vertical": 40,  # voucher
+    "Halve surge exposure": 25,                       # fare-lock subsidy
+    "On-time deliveries (no delivery delays)": 20,    # late-order credits + SLA
+}
+
 # What-if intervention presets: label -> function(features_df) -> modified copy.
 WHAT_IF_PRESETS = {
     "Halve Captain cancellations": lambda X: X.assign(
@@ -197,9 +210,13 @@ def run_experiments(
             "train_seconds": time.time() - t0,
         })
 
+    # Model selection uses mean CV AUC (training data only); the holdout is
+    # never part of selection, so its metrics stay an unbiased estimate of the
+    # chosen model (Raschka 2018, arXiv:1811.12808). Selecting on holdout AUC
+    # would silently turn the test set into a validation set.
     leaderboard = (
         pd.DataFrame(leaderboard_rows)
-        .sort_values("test_auc", ascending=False)
+        .sort_values("cv_auc_mean", ascending=False)
         .reset_index(drop=True)
     )
     best_name = leaderboard.loc[0, "model"]
@@ -337,15 +354,17 @@ def what_if(results: dict, preset_name: str) -> dict:
     new_p = model.predict_proba(X_new)[:, 1]
 
     users_affected = int((X_new != X).any(axis=1).sum())
+    revenue_protected = float((np.maximum(base_p - new_p, 0) * spend).sum() * 12)
+    cost = users_affected * INTERVENTION_COSTS.get(preset_name, 15)
     return {
         "intervention": preset_name,
         "users_affected": users_affected,
         "baseline_churn_rate": float(base_p.mean()),
         "new_churn_rate": float(new_p.mean()),
         "churners_prevented": float(np.maximum(base_p - new_p, 0).sum()),
-        "annual_revenue_protected_aed": float(
-            (np.maximum(base_p - new_p, 0) * spend).sum() * 12
-        ),
+        "annual_revenue_protected_aed": revenue_protected,
+        "est_annual_cost_aed": float(cost),
+        "roi": float((revenue_protected - cost) / cost) if cost else None,
     }
 
 

@@ -125,13 +125,14 @@ if results:
                 "recall_at_top10pct": "{:.1%}", "brier_score": "{:.3f}",
                 "train_seconds": "{:.1f}s",
             }
-        ).highlight_max(subset=["test_auc"], color="#1a7f37"),
+        ).highlight_max(subset=["cv_auc_mean"], color="#1a7f37"),
         width="stretch",
     )
     best = lb.iloc[0]
     st.success(
-        f"**Winner: {results['best_model']}** - holdout AUC {best['test_auc']:.3f}, "
-        f"catching {best['recall_at_top10pct']:.0%} of churners in the riskiest 10% of users."
+        f"**Winner: {results['best_model']}** - selected by mean CV AUC {best['cv_auc_mean']:.3f}; "
+        f"unbiased holdout AUC {best['test_auc']:.3f}, catching "
+        f"{best['recall_at_top10pct']:.0%} of churners in the riskiest 10% of users."
     )
 
     # ------------------------------------------------------ 3. Root cause
@@ -218,7 +219,7 @@ if results:
     # ------------------------------------------------------ 4. Playbook
     st.header("4 · Retention playbook")
     st.markdown(
-        "Top-decile-risk users, segmented by **dominant churn driver** and mapped to an "
+        "Top-decile-risk users, segmented into **retention segments** (rule-based action mapping) and mapped to an "
         "action, ranked by annual revenue protected. Save rates are planning assumptions."
     )
     st.dataframe(
@@ -260,7 +261,7 @@ if results:
     k1.metric("Customers at risk (top decile)", f"{int(results['segments']['users'].sum()):,}")
     k2.metric("Annual revenue at risk (holdout)", f"AED {results['revenue_at_risk_annual_aed']:,.0f}")
     k3.metric("#1 churn driver", results["importance"].iloc[0]["feature"])
-    k4.metric("Best intervention ROI", f"AED {top_play['annual_revenue_protected_aed']:,.0f}/yr")
+    k4.metric("Highest est. annual upside", f"AED {top_play['annual_revenue_protected_aed']:,.0f}/yr")
 
     st.markdown("**All interventions, ranked by simulated annual revenue protected:**")
     st.dataframe(
