@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Churn Lab — Autonomous Churn Experimenter</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⬢</text></svg>">
+</head>
+<body>
+
+<div class="shell">
+
+  <!-- ======================= sidebar ======================= -->
+  <aside class="sidebar">
+    <div class="brand"><span class="brand-mark">⬢</span> Churn&nbsp;Lab</div>
+    <p class="brand-sub">Autonomous Churn Experimenter</p>
+
+    <div class="role-block">
+      <label>Workspace view</label>
+      <div class="role-switch" id="role-switch">
+        <button data-role="ds" class="active">Data&nbsp;Scientist</button>
+        <button data-role="pm">Product</button>
+        <button data-role="exec">Executive</button>
+      </div>
+    </div>
+
+    <nav id="nav">
+      <button class="nav-item active" data-view="experiments"><span>⚗</span> Experiments</button>
+      <button class="nav-item" data-view="rootcause"><span>◎</span> Root causes</button>
+      <button class="nav-item" data-view="playbook"><span>▦</span> Playbook</button>
+      <button class="nav-item" data-view="whatif"><span>⇄</span> What-if studio</button>
+      <button class="nav-item" data-view="leadership"><span>◆</span> Leadership</button>
+      <button class="nav-item" data-view="narrator"><span>✎</span> Narrator</button>
+      <button class="nav-item" data-view="method"><span>⚙</span> Methodology</button>
+    </nav>
+
+    <div class="sidebar-foot">
+      <div class="run-chip" id="run-chip">run-001</div>
+      <p>Synthetic, self-created data grounded in publicly-documented pain points.
+      No confidential data.</p>
+    </div>
+  </aside>
+
+  <!-- ======================= workspace ======================= -->
+  <main class="workspace">
+    <header class="topbar">
+      <div>
+        <h1 id="view-title">Experiments</h1>
+        <p id="view-sub" class="topbar-sub"></p>
+      </div>
+      <div class="topbar-right">
+        <span class="status-chip" id="status-chip">● ready</span>
+      </div>
+    </header>
+
+    <!-- ============ view: experiments (runner) ============ -->
+    <div class="view active" id="view-experiments">
+      <div class="grid-side">
+        <div class="card run-card">
+          <h3>New experiment</h3>
+          <div class="field">
+            <label>Users to simulate <output id="out-users">8,000</output></label>
+            <input type="range" id="in-users" min="2000" max="20000" step="1000" value="8000">
+          </div>
+          <div class="field-row">
+            <div class="field"><label>Seed</label><input type="number" id="in-seed" value="42" min="0"></div>
+            <div class="field"><label>Holdout %</label>
+              <select id="in-test"><option value="0.2">20%</option><option value="0.25" selected>25%</option>
+              <option value="0.3">30%</option><option value="0.4">40%</option></select></div>
+          </div>
+          <div class="field"><label>Models to compare</label><div id="model-checks" class="checks"></div></div>
+          <button class="btn btn-wide" id="run-btn">▶ Run autonomous loop</button>
+          <p class="fineprint" id="run-note">Runs the full pipeline server-side: simulate → 5-fold CV →
+          holdout → drivers → counterfactuals. Typically 10–30s.</p>
+        </div>
+        <div class="stack">
+          <div class="grid-4" id="exp-kpis"></div>
+          <div class="card">
+            <h3>Model leaderboard <span class="tag" id="lb-run-tag"></span></h3>
+            <div id="leaderboard"></div>
+            <div class="callout callout-good" id="winner-callout"></div>
+          </div>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <h3>Run history</h3>
+          <p class="card-sub">Every run is kept in the registry — click one to load it into every workspace.</p>
+          <div id="run-history"></div>
+        </div>
+        <div class="card">
+          <h3>The cross-vertical effect</h3>
+          <p class="card-sub">Churn rate by number of active verticals in the current run.</p>
+          <div id="verticals-chart" class="chart"></div>
+          <p class="fineprint">Careem publicly reports Plus subscribers retain ~3× and use ~2× as many
+          services — the same shape as this curve.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ view: root causes ============ -->
+    <div class="view" id="view-rootcause">
+      <div class="tabs" data-tabs="rc">
+        <button class="tab active" data-tab="rc-global">Model drivers</button>
+        <button class="tab" data-tab="rc-evidence">Pain-point evidence</button>
+        <button class="tab" data-tab="rc-local">Explain a user</button>
+      </div>
+      <div class="tabpanel active" id="rc-global">
+        <div class="card">
+          <h3>What the model relies on <span class="tag">permutation importance</span></h3>
+          <div id="importance-chart" class="chart"></div>
+        </div>
+      </div>
+      <div class="tabpanel" id="rc-evidence">
+        <div class="card">
+          <h3>Why the numbers look this way <span class="tag">churn lift, exposed vs not</span></h3>
+          <div id="rca-chart" class="chart"></div>
+          <div class="callout callout-good" id="validation-callout"></div>
+          <div class="callout callout-warn" id="confounding-callout"></div>
+        </div>
+      </div>
+      <div class="tabpanel" id="rc-local">
+        <div class="card">
+          <h3>Why is <em>this</em> user at risk?</h3>
+          <p class="card-sub">Counterfactual attribution — each feature reset to the typical value,
+          risk change measured. Warm bars push risk up; cool bars pull it down.</p>
+          <div class="user-picker" id="user-picker"></div>
+          <div class="grid-2">
+            <div id="user-summary"></div>
+            <div id="contrib-chart" class="chart"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ view: playbook ============ -->
+    <div class="view" id="view-playbook">
+      <div class="card">
+        <h3>Retention playbook <span class="tag">top-decile risk, ranked by revenue protected</span></h3>
+        <p class="card-sub">Users segmented by dominant churn driver and mapped to an action.
+        Save rates are planning assumptions.</p>
+        <div id="segments-table"></div>
+      </div>
+    </div>
+
+    <!-- ============ view: what-if ============ -->
+    <div class="view" id="view-whatif">
+      <div class="pill-row" id="whatif-pills"></div>
+      <div class="grid-4" id="whatif-stats"></div>
+      <div class="card" id="whatif-design"></div>
+      <p class="fineprint">Model-based counterfactual on the holdout set — a prioritisation signal,
+      not an A/B result. See Methodology for exactly how this is computed.</p>
+    </div>
+
+    <!-- ============ view: leadership ============ -->
+    <div class="view" id="view-leadership">
+      <div class="dark-wrap">
+        <div class="grid-4" id="leadership-kpis"></div>
+        <div class="card card-on-dark">
+          <h3>All interventions, ranked by simulated annual revenue protected</h3>
+          <div id="whatif-table"></div>
+        </div>
+        <div class="ask" id="the-ask"></div>
+      </div>
+    </div>
+
+    <!-- ============ view: narrator ============ -->
+    <div class="view" id="view-narrator">
+      <div class="tabs" data-tabs="nr">
+        <button class="tab active" data-tab="nr-live">Live narrator</button>
+        <button class="tab" data-tab="nr-sample">Example Claude output</button>
+        <button class="tab" data-tab="nr-prompt">The prompt</button>
+      </div>
+      <div class="tabpanel active" id="nr-live">
+        <div class="card">
+          <div class="narrate-controls">
+            <input type="password" id="api-key" placeholder="Anthropic API key (optional)">
+            <button class="btn" id="narrate-btn">✎ Narrate this run</button>
+          </div>
+          <p class="narrate-source" id="narrate-source"></p>
+          <div class="brief" id="narrate-output"></div>
+        </div>
+      </div>
+      <div class="tabpanel" id="nr-sample">
+        <div class="card">
+          <p class="card-sub">Pre-generated with Claude using this exact prompt on the default run —
+          the LLM experience with zero setup.</p>
+          <div class="brief" id="sample-brief"></div>
+        </div>
+      </div>
+      <div class="tabpanel" id="nr-prompt">
+        <div class="card"><pre id="prompt-text"></pre></div>
+      </div>
+    </div>
+
+    <!-- ============ view: methodology ============ -->
+    <div class="view" id="view-method">
+      <div class="card">
+        <h3>The pipeline — what actually runs when you hit “Run”</h3>
+        <div class="pipeline" id="pipeline"></div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <h3>How every headline number is computed</h3>
+          <div id="glossary"></div>
+        </div>
+        <div class="stack">
+          <div class="card">
+            <h3>Honest limitations</h3>
+            <ul class="method-list">
+              <li><strong>Synthetic data.</strong> The generator encodes plausible, publicly-documented
+              behaviour; real data will be noisier and drivers must be re-estimated.</li>
+              <li><strong>Counterfactuals ≠ causality.</strong> The what-if engine assumes the model's
+              feature–risk relationship is causal for the mutated feature. It ranks bets; A/B tests
+              confirm them.</li>
+              <li><strong>Save rates are assumptions.</strong> Playbook impact uses planning numbers,
+              clearly labelled, until pilots measure real treatment effects.</li>
+              <li><strong>Attribution is one-at-a-time.</strong> Local explanations mutate one feature
+              at a time (no interaction effects) — fast and intuitive, less exact than SHAP.</li>
+            </ul>
+          </div>
+          <div class="card">
+            <h3>From prototype to production</h3>
+            <ul class="method-list">
+              <li><strong>Label definition:</strong> replace the simulated flag with an observed one
+              (e.g. no session in 60 days), with a locked feature-cutoff date to prevent leakage.</li>
+              <li><strong>Calibration &amp; monitoring:</strong> calibrate probabilities (isotonic),
+              track AUC/PR and feature drift per market, retrain on schedule.</li>
+              <li><strong>Serving:</strong> batch-score nightly into the personalization layer;
+              expose segments to CRM/offer systems; log outcomes back for the next retrain.</li>
+              <li><strong>Experimentation:</strong> wire the playbook to the experiment platform —
+              every action ships with its primary metric and guardrails (see What-if studio).</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Stack</h3>
+        <p class="card-sub">Python · pandas · scikit-learn (LogReg / Random Forest / HistGradientBoosting,
+        5-fold stratified CV, permutation importance) · FastAPI backend with an in-memory run registry ·
+        dependency-free HTML/CSS/JS frontend · Claude (Opus 4.8) for narration with a deterministic
+        fallback · fully reproducible from a seed. Sources for every pain point are in
+        <a href="https://github.com/" onclick="return false" title="RESEARCH.md in the repo">RESEARCH.md</a>.</p>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

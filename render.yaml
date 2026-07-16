@@ -1,0 +1,9 @@
+# One-click deploy blueprint for Render (https://render.com)
+# Dashboard -> New -> Blueprint -> pick this repo, or:
+# https://render.com/deploy?repo=<this repo URL>
+services:
+  - type: web
+    name: churn-lab
+    runtime: docker
+    plan: free
+    healthCheckPath: /api/runs

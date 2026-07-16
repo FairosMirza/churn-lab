@@ -1,0 +1,6 @@
+.venv/
+__pycache__/
+.claude/
+SUBMISSION.md
+*.csv
+sync-preview.sh
