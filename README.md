@@ -40,10 +40,15 @@ The dataset is fully synthetic, self-created, and reproducible from a seed.
 ## What the experiment loop does
 
 1. **Generate** N synthetic users (sidebar-configurable).
-2. **Compare models** — Logistic Regression, Random Forest, Gradient Boosting —
-   with 5-fold CV and a stratified 25% holdout.
+2. **Compare models** — Logistic Regression, Random Forest, Gradient Boosting.
+   **Selection uses mean 5-fold CV AUC on training data only**; the untouched
+   holdout provides the final unbiased estimate (Raschka 2018,
+   [arXiv:1811.12808](https://arxiv.org/abs/1811.12808)) — selecting on the
+   holdout would bias its estimate ("test-set peeking").
 3. **Score honestly** — ROC-AUC, PR-AUC vs the base rate, Brier score, and
    *recall in the riskiest 10%* — the metric a retention team actually cares about.
+   What-if interventions carry assumed costs and true **ROI = (revenue protected −
+   cost) / cost**, so ROI-negative plays are flagged instead of celebrated.
 4. **Explain at three levels (root-cause analysis)** —
    *global*: permutation importance shows what the model relies on;
    *evidence*: churn-rate lifts for users exposed vs not exposed to each pain
