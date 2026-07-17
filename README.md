@@ -31,9 +31,10 @@ personalization team can act on.
 
 The dataset is fully synthetic, self-created, and reproducible from a seed.
 
-> **Product grounding:** every pain point, intervention, and benchmark in the
-> app is backed by public sources (reviews, news, Careem's own publications) —
-> see [RESEARCH.md](RESEARCH.md). Notably, our synthetic non-subscriber churn
+> **Deep dives:** [ARCHITECTURE.md](ARCHITECTURE.md) — full system architecture,
+> data contracts, algorithms and the production path. [RESEARCH.md](RESEARCH.md)
+> — every pain point, intervention, and benchmark traced to public sources
+> (reviews, news, Careem's own publications). Notably, our synthetic non-subscriber churn
 > lift (2.8×) independently lands on Careem's publicly reported ~3× retention
 > for Plus members.
 
